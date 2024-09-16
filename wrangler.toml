@@ -1,11 +1,10 @@
-name = "mongo-realm-worker"
-main = "src/index.ts"
+name = "webapi"
+main = "src/index.js"
 compatibility_date = "2024-03-29"
 compatibility_flags = ["nodejs_compat"]
 
-account_id = "CLOUDFLARE_ACCOUNT_ID"
+account_id = "6d1b4ec9446a1aab0c6ddb15c6e23cfc"
 workers_dev = true # or zone_id = "<ZONE ID>" if you have one
 
 [vars]
-ATLAS_APPID = "MONGODB_ATLAS_APPID"
-
+ATLAS_APPID = "wordpressdb-xwrfbxe"

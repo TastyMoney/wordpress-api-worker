@@ -2,75 +2,135 @@ import * as Realm from 'realm-web';
 import * as utils from './utils';
 let App;
 const ObjectId = Realm.BSON.ObjectID;
-// Define the Worker logic
+
 const worker = {
     async fetch(req, env) {
         const url = new URL(req.url);
         App = App || new Realm.App(env.ATLAS_APPID);
+        const query = url.searchParams;
         const method = req.method;
-        const path = url.pathname.replace(/[/]$/, '');
-        const todoID = url.searchParams.get('id') || '';
-        if (path !== '/api/todos') {
-            return utils.toError(`Unknown '${path}' URL; try '/api/todos' instead.`, 404);
+        const token = env.MONGO_API_KEY;
+        
+
+        const path = url.pathname.split('/').filter(p => p.length > 0);
+        if (path.length === 0){
+            return new Response('Endpoint not found' + path, { status: 404 });
         }
-        const token = req.headers.get('authorization');
+
+
         if (!token)
             return utils.toError(`Missing 'authorization' header; try to add the header 'authorization: ATLAS_APP_API_KEY'.`, 401);
         try {
             const credentials = Realm.Credentials.apiKey(token);
-            // Attempt to authenticate
             var user = await App.logIn(credentials);
             var client = user.mongoClient('mongodb-atlas');
         }
         catch (err) {
             return utils.toError('Error with authentication.', 500);
         }
-        // Grab a reference to the "cloudflare.todos" collection
-        const collection = client.db('cloudflare').collection('todos');
-        try {
-            if (method === 'GET') {
-                if (todoID) {
-                    // GET /api/todos?id=XXX
-                    return utils.reply(await collection.findOne({
-                        _id: new ObjectId(todoID)
-                    }));
-                }
-                // GET /api/todos
-                return utils.reply(await collection.find());
-            }
-            // POST /api/todos
-            if (method === 'POST') {
-                const { todo } = await req.json();
-                return utils.reply(await collection.insertOne({
-                    owner_id: user.id,
-                    done: false,
-                    todo: todo,
-                }));
-            }
-            // PATCH /api/todos?id=XXX&done=true
-            if (method === 'PATCH') {
-                return utils.reply(await collection.updateOne({
-                    _id: new ObjectId(todoID)
-                }, {
-                    $set: {
-                        done: url.searchParams.get('done') === 'true'
-                    }
-                }));
-            }
-            // DELETE /api/todos?id=XXX
-            if (method === 'DELETE') {
-                return utils.reply(await collection.deleteOne({
-                    _id: new ObjectId(todoID)
-                }));
-            }
-            // unknown method
-            return utils.toError('Method not allowed.', 405);
-        }
-        catch (err) {
-            const msg = err.message || 'Error with query.';
-            return utils.toError(msg, 500);
+        const collection = client.db('website_content').collection('posts');
+
+        const route = path[0];
+        switch(route) {
+            case 'getpostbypostid':
+                return getPostById(path[1], collection, query);
+            case 'getpostsbycatid':
+                return getPostsByCatId(path[1], collection, query);
+            case 'getpostsbytagid':
+                return getPostsByTagId(path[1], collection, query);
+            case 'getallposts':
+                return getAllPosts(collection, query);
+    
+            default:
+                return new Response('Endpoint not found', { status: 404 });
         }
     }
 };
-// Export for discoverability
+
+async function getPostsByCatId(catId, collection, query) {
+    const { page, pageSize } = utils.parsePaginationParams(query);
+    const skip = (page - 1) * pageSize;
+    // const matchStage = {
+    //     $match: {
+    //         "categories.id": { "$numberInt": catId.toString() }
+    //     }
+    // };
+    // const skipStage = { $skip: skip };
+    // const limitStage = { $limit: pageSize };
+
+
+    const aggregationPipeline = [
+        { $match: { "categories.id": { "$numberInt": catId.toString() } } },
+        {
+            $facet: {
+                totalData: [
+                    { $count: "total" }
+                ],
+                data: [
+                    { $skip: skip },
+                    { $limit: pageSize }
+                ]
+            }
+        }
+    ];
+
+    // const aggregationPipeline = [
+    //     matchStage,
+    //     skipStage,
+    //     limitStage
+    // ];
+
+    const results = await collection.aggregate(aggregationPipeline);
+
+    if (results.length > 0) {
+        const totalRecords = results[0].totalData.length > 0 ? results[0].totalData[0].total : 0;
+        const totalPages = Math.ceil(totalRecords / pageSize);
+        const data = results[0].data;
+
+        return utils.toJSON({
+            totalRecords,
+            totalPages,
+            data
+        });
+    }
+    return utils.toJSON({totalRecords: 0, totalPages: 0, data: [] });
+
+    return utils.toJSON(data);
+}
+
+
+async function getPostsByTagId(tagId, collection, query) {
+
+    const { page, pageSize } = utils.parsePaginationParams(query);
+
+    const skip = (page - 1) * pageSize;
+    const matchStage = {
+        $match: {
+            "tags.id": { "$numberInt": tagId.toString() }
+        }
+    };
+    const skipStage = { $skip: skip };
+    const limitStage = { $limit: pageSize };
+
+    const aggregationPipeline = [
+        matchStage,
+        skipStage,
+        limitStage
+    ];
+
+    const data = await collection.aggregate(aggregationPipeline);
+    return utils.toJSON(data);
+}
+
+
+async function getPostById(postId, collection, query) {
+    return utils.reply(await collection.findOne({wp_post_id:{"$numberInt": postId.toString()}}));
+}
+
+async function getAllPosts(collection,query){
+    return utils.handlePaginatedRequest(collection, {}, query);
+
+}
+
+
 export default worker;
