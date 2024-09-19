@@ -9,6 +9,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@cloudflare/wrangler": "^1.21.0",
     "realm-web": "^2.0.0"
   },
   "devDependencies": {

@@ -1,6 +1,9 @@
 export function toJSON(data, status = 200) {
     let body = JSON.stringify(data, null, 2);
-    let headers = { 'content-type': 'application/json' };
+    let headers = { 'content-type': 'application/json' ,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"};
     return new Response(body, { headers, status });
 }
 export function toError(error, status = 400) {
