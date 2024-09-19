@@ -61,6 +61,8 @@ async function getPostsByCatId(catId, collection, query) {
 
     const aggregationPipeline = [
         { $match: { "categories.id": { "$numberInt": catId.toString() } } },
+
+        { $sort: { "published_at": -1 } }, // 按
         {
             $facet: {
                 totalData: [
@@ -107,13 +109,17 @@ async function getPostsByTagId(tagId, collection, query) {
     const matchStage = {
         $match: {
             "tags.id": { "$numberInt": tagId.toString() }
-        }
+        },
+        
+        
     };
+    const sortStage = { $sort: { "published_at": -1 } };
     const skipStage = { $skip: skip };
     const limitStage = { $limit: pageSize };
 
     const aggregationPipeline = [
         matchStage,
+        sortStage,
         skipStage,
         limitStage
     ];
