@@ -34,6 +34,8 @@ const worker = {
         switch(route) {
             case 'getpostbypostid':
                 return getPostById(path[1], collection, query);
+            case 'getpostbyslug':
+                return getPostBySlug(path[1], collection, query);
             case 'getpostsbycatid':
                 return getPostsByCatId(path[1], collection, query);
             case 'getpostsbytagid':
@@ -132,7 +134,24 @@ async function getPostsByTagId(tagId, collection, query) {
 async function getPostById(postId, collection, query) {
     return utils.reply(await collection.findOne({wp_post_id:{"$numberInt": postId.toString()}}));
 }
+async function getPostBySlug(slugId, collection, query) {
+    try {
+        const lowerCaseSlugId = slugId.toLowerCase();
+        const post = await collection.findOne({ slug: lowerCaseSlugId });
+        
+        if (!post) {
+            // Log if no post is found
+            console.error(`No post found for slug: ${slugId}`);
+            return utils.toError('Post not found', 404);
+        }
 
+        return utils.reply(post);
+    } catch (error) {
+        // Log the error message with additional context
+        console.error('Error fetching post by slug:', error.message || error);
+        return utils.toError('Internal Server Error', 500);
+    }
+  }
 async function getAllPosts(collection,query){
     return utils.handlePaginatedRequest(collection, {}, query);
 

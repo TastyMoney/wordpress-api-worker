@@ -8,3 +8,6 @@ workers_dev = true # or zone_id = "<ZONE ID>" if you have one
 
 [vars]
 ATLAS_APPID = "wordpressdb-xwrfbxe"
+
+[observability]
+enabled = true
