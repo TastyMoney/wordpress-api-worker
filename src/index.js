@@ -42,6 +42,13 @@ const worker = {
                 return getPostsByTagId(path[1], collection, query);
             case 'getallposts':
                 return getAllPosts(collection, query);
+         
+            case 'getipos':
+                return getIPOs(collection, query);
+      
+            case 'getiposbymonthandyear':
+                // Expecting path like /getIPOsByMonthAndYear/2025/01
+                return getIPOsByMonthAndYear(path[1], path[2], collection, query);
     
             default:
                 return new Response('Endpoint not found', { status: 404 });
@@ -155,6 +162,47 @@ async function getPostBySlug(slugId, collection, query) {
 async function getAllPosts(collection,query){
     return utils.handlePaginatedRequest(collection, {}, query);
 
+}
+
+async function getIPOs(collection, query) {
+    const { page, pageSize } = utils.parsePaginationParams(query);
+    const skip = (page - 1) * pageSize;
+
+    const aggregationPipeline = [
+        { $match: { type: 'ipo' } },
+        { $sort: { ipo_date: -1 } },
+        { $skip: skip },
+        { $limit: pageSize }
+    ];
+
+    const data = await collection.aggregate(aggregationPipeline);
+    return utils.toJSON(data);
+}
+
+async function getIPOsByMonthAndYear(yearParam, monthParam, collection, query) {
+    // Expecting parameters in the path as '/:year/:month', e.g. '/2025/01'
+    const year = parseInt(yearParam, 10);
+    const monthIndex = parseInt(monthParam, 10) - 1; // 0-based
+
+    if (Number.isNaN(year) || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+        return utils.toError("Invalid year or month. Use '/getIPOsByMonthAndYear/YYYY/MM'.", 400);
+    }
+
+    const monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+    const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
+
+    const { page, pageSize } = utils.parsePaginationParams(query);
+    const skip = (page - 1) * pageSize;
+
+    const aggregationPipeline = [
+        { $match: { type: 'ipo', ipo_date: { $gte: monthStart, $lt: monthEnd } } },
+        { $sort: { ipo_date: -1 } },
+        { $skip: skip },
+        { $limit: pageSize }
+    ];
+
+    const data = await collection.aggregate(aggregationPipeline);
+    return utils.toJSON(data);
 }
 
 

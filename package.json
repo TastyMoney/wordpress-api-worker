@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "test-realm",
+  "name": "tasty-webapi-realm",
   "scripts": {
     "types": "tsc --noEmit --skipLibCheck",
     "deploy": "wrangler deploy",
